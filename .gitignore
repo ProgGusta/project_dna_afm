@@ -1,3 +1,9 @@
+# Ignora a pasta de dados brutos e processados.
+data/
+
+# Ignora todas as pastas de resultados que foram criadas pelos scripts.
+results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
