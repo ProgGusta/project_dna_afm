@@ -1,68 +1,48 @@
 # main.py
-import os
-import pandas as pd
-from src.dna_analyzer import (
-    Loader,
-    Saver,
-    StatsCalculator,
-    Analyzer
+import argparse
+from dna_analyzer import (
+    run_dose_response_pipeline,
+    run_skeleton_analysis_pipeline,
+    run_comparison_pipeline,
+    run_preprocessing_task_pipeline,
+    run_skeleton_length_analysis_pipeline,
+    run_visualization_per_dose_pipeline,
+    run_analysis_pipeline
 )
 
-def run_analysis():
-    # --- Configuração ---
-    INPUT_DIR = './data/processed/extended_images'  # Diretório de entrada
-    OUTPUT_DIR = './results/statistics/perimeters'  # Nome da pasta de saída
+# Mapeia os nomes amigáveis das pipelines para as funções que as executam
+PIPELINES = {
+    "dose-response": run_dose_response_pipeline,
+    "skeleton-viz": run_skeleton_analysis_pipeline,
+    "compare-edges": run_comparison_pipeline,
+    "preprocess": run_preprocessing_task_pipeline,
+    "skeleton-length": run_skeleton_length_analysis_pipeline,
+    "visualization-per-dose": run_visualization_per_dose_pipeline,
+    "analysis": run_analysis_pipeline
+}
 
-    ANALYZER_CONFIG = {
-        'segmenter': {'canny_threshold1': 100, 'canny_threshold2': 200},
-        'extractor': {'circularity_threshold': 0.8}
-    }
-
-    # --- Inicialização dos Objetos ---
-    loader = Loader()
-    analyzer = Analyzer(config=ANALYZER_CONFIG)
-    saver = Saver(output_directory=OUTPUT_DIR)
-    stats_calculator = StatsCalculator()
-
-    # --- Processamento ---
-    image_files = [f for f in os.listdir(INPUT_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    all_stats = []
-
-    for filename in image_files:
-        print(f"Processando {filename}...")
-        image_path = os.path.join(INPUT_DIR, filename)
-
-        image = loader.load_grayscale(image_path)
-        if image is None:
-            continue
-
-        results = analyzer.process(image)
-        
-        stats = results["statistics"]
-        stats['Imagem'] = filename
-        all_stats.append(stats)
-        
-        # Opcional: Salvar imagens individuais de DNA/RNA pode ser feito aqui se necessário
-        # base_name = os.path.splitext(filename)[0]
-        # saver.save_image(results["dna_image"], f"{base_name}_dna.png")
-        # saver.save_image(results["rna_image"], f"{base_name}_rna.png")
-
-    # --- Finalização e Geração de Relatórios ---
-    if not all_stats:
-        print("Nenhuma imagem processada. Encerrando.")
-        return
-
-    # 1. Criar e salvar o DataFrame de resultados por imagem (como antes)
-    df_results = pd.DataFrame(all_stats)
-    df_results = df_results[['Imagem', 'Num DNA', 'Perímetro DNA', 'Num RNA', 'Perímetro RNA']]
-    saver.save_dataframe(df_results, "resultados_perimetros.csv")
-
-    # 2. Calcular e salvar as estatísticas descritivas gerais
-    print("\nCalculando estatísticas descritivas gerais...")
-    df_descriptive_stats = stats_calculator.calculate_descriptive_stats(df_results)
-    saver.save_dataframe(df_descriptive_stats, "estatisticas_descritivas_gerais.csv")
+def main():
+    # --- Configuração do argparse ---
+    parser = argparse.ArgumentParser(
+        description="DNA Analyzer: Ferramenta para análise de imagens de AFM de DNA.",
+        formatter_class=argparse.RawTextHelpFormatter # Melhora a formatação da ajuda
+    )
     
-    print("\nAnálise e geração de estatísticas concluídas com sucesso.")
+    parser.add_argument(
+        "pipeline",
+        help="O nome da pipeline de análise a ser executada.",
+        choices=PIPELINES.keys() # Restringe as escolhas às chaves do nosso dicionário
+    )
+    
+    args = parser.parse_args()
+    
+    # --- Execução da pipeline escolhida ---
+    selected_pipeline_func = PIPELINES.get(args.pipeline)
+    
+    if selected_pipeline_func:
+        selected_pipeline_func()
+    else:
+        print(f"Erro: Pipeline '{args.pipeline}' não encontrada.")
 
 if __name__ == "__main__":
-    run_analysis()
+    main()

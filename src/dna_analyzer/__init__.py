@@ -1,11 +1,6 @@
 # src/dna_analyzer/__init__.py
 
-# Importa as classes principais de cada módulo para o nível do pacote.
-# Isso permite que os usuários importem diretamente do pacote 'dna_analyzer'
-# em vez de precisar saber a estrutura interna dos arquivos.
-
-from .loader import Loader
-from .saver import Saver
+# Importa as classes dos módulos principais
 from .preprocessor import ImagePreprocessor
 from .segmenter import Segmenter
 from .feature_extractor import FeatureExtractor
@@ -13,17 +8,26 @@ from .stats_calculator import StatsCalculator
 from .visualizer import Visualizer
 from .analyzer import Analyzer
 
-# Definir a variável __all__ para controlar 'from dna_analyzer import *'
+# Importa as classes do submódulo de IO
+from .io import Loader, Saver
+
+# Importa as funções de pipeline para serem usadas pelo main.py
+from .pipelines import (
+    run_dose_response_pipeline,
+    run_skeleton_analysis_pipeline,
+    run_comparison_pipeline,
+    run_preprocessing_task_pipeline,
+    run_skeleton_length_analysis_pipeline,
+    run_visualization_per_dose_pipeline,
+    run_analysis_pipeline
+)
+
 __all__ = [
-    'Loader',
-    'Saver',
-    'ImagePreprocessor',
-    'Segmenter',
-    'FeatureExtractor',
-    'StatsCalculator',
-    'Visualizer',
-    'Analyzer',
+    'Loader', 'Saver', 'ImagePreprocessor', 'Segmenter', 'FeatureExtractor',
+    'StatsCalculator', 'Visualizer', 'Analyzer', 'run_dose_response_pipeline',
+    'run_skeleton_analysis_pipeline', 'run_comparison_pipeline',
+    'run_preprocessing_task_pipeline', 'run_skeleton_length_analysis_pipeline',
+    'run_visualization_per_dose_pipeline', 'run_analysis_pipeline'
 ]
 
-# Definir a versão do pacote
-__version__ = "1.0.0"
+__version__ = "2.0.0" # Versão atualizada

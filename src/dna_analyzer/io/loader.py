@@ -1,4 +1,4 @@
-# src/dna_analyzer/loader.py
+# src/dna_analyzer/io/loader.py
 import cv2
 
 class Loader:

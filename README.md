@@ -32,16 +32,19 @@ projeto_dna_afm/
 ├── src/
 │   └── dna_analyzer/
 │       ├── __init__.py
+│       ├── io/
+│       │   ├── __init__.py
+│       │   ├── loader.py
+│       │   └── saver.py
+│       ├── pipelines.py
+│       ├── analyzer.py
 │       ├── preprocessor.py
 │       ├── segmenter.py
 │       ├── feature_extractor.py
 │       ├── stats_calculator.py
-│       ├── visualizer.py
-│       └── analyzer.py
+│       └── visualizer.py
+├── main.py
 ├── .gitignore
-├── main_dose_response.py
-├── main_skeleton_analysis.py
-├── main_compare.py
 ├── pyproject.toml
 └── README.md
 ```
@@ -52,7 +55,7 @@ projeto_dna_afm/
     * `processed/`: Para imagens após etapas de pré-processamento.
 * **`results/`**: Armazena todas as saídas geradas pelos scripts, como imagens processadas, gráficos e arquivos CSV com estatísticas. **Também ignorada pelo Git**.
 * **`notebooks/`**: Para Jupyter Notebooks utilizados em análises exploratórias e testes de algoritmos.
-* **`main_*.py`**: Scripts de ponto de entrada, cada um projetado para executar uma tarefa ou experimento específico (ex: `main_dose_response.py` para gerar gráficos de dose-resposta).
+* **`main_*.py`**:  Ponto de entrada único e centralizado para executar todas as análises disponíveis no projeto.
 * **`pyproject.toml`**: Arquivo de configuração do projeto que define metadados e, mais importante, as dependências necessárias para executá-lo.
 * **`.gitignore`**: Especifica quais arquivos e pastas devem ser ignorados pelo Git.
 * **`README.md`**: Este arquivo de documentação.
@@ -112,22 +115,64 @@ pip install -e .
 
 ## Como Executar
 
-Cada script `main_*.py` na raiz do projeto foi projetado para executar uma análise específica.
+Todas as análises foram centralizadas em um único ponto de entrada, o script `main.py`. Para executar uma tarefa específica, você deve passar o nome da "pipeline" desejada como um argumento na linha de comando.
 
-### Exemplo: Análise de Dose-Resposta
+### Descobrindo as Pipelines Disponíveis
 
-Este script processa um conjunto pré-definido de imagens, cada uma associada a uma dose de radiação, e gera gráficos mostrando o impacto da dose no DNA.
+Para ver todas as pipelines disponíveis e uma breve descrição do programa, use a flag `-h` ou `--help`:
 
-1.  **Verifique os Caminhos**: Antes de executar, abra o arquivo `main_dose_response.py` e garanta que os caminhos no dicionário `IMAGE_PATHS` apontem para a localização correta das suas imagens na pasta `data/`.
+```bash
+python main.py --help
+```
 
-2.  **Execute o Script**: No terminal (com o ambiente virtual ativado), execute o seguinte comando a partir da pasta raiz do projeto:
-    ```bash
-    python main_dose_response.py
-    ```
+A saída mostrará todas as `choices` (escolhas) disponíveis para a execução:
+```
+usage: main.py [-h] {dose-response,skeleton-viz,compare-edges,preprocess,skeleton-length,visualization-per-dose,analysis}
 
-### O que Esperar
-* O terminal exibirá o progresso do processamento para cada dose.
-* Ao final, os resultados numéricos serão impressos no console.
-* Uma nova pasta será criada em `results/resultados_dose_resposta/`, contendo os gráficos salvos em formato `.png` (ex: `grafico_fragmentos_vs_dose.png`).
+DNA Analyzer: Ferramenta para análise de imagens de AFM de DNA.
 
-Para executar outras análises, utilize o script correspondente, como `python main_skeleton_analysis.py` para a análise de esqueletos.
+positional arguments:
+  {dose-response,skeleton-viz,compare-edges,preprocess,skeleton-length,visualization-per-dose,analysis}
+                        O nome da pipeline de análise a ser executada.
+
+options:
+  -h, --help            show this help message and exit
+```
+
+### Pipelines Disponíveis
+
+* **`analysis`**: Executa a análise padrão em um diretório de imagens, gerando um CSV com as estatísticas de DNA/RNA por imagem e outro CSV com as estatísticas descritivas (média, mediana, etc.) do conjunto completo.
+
+* **`preprocess`**: Pré-processa um diretório de imagens, normalizando seus tamanhos para um padrão (ex: 512x512) com preenchimento de borda suavizado. Ideal para preparar os dados para outras análises.
+
+* **`compare-edges`**: Compara diferentes algoritmos de detecção de borda (Canny, Sobel, etc.) em uma imagem de amostra e salva os resultados visuais na pasta de resultados.
+
+* **`dose-response`**: Executa a análise de dose-resposta em um conjunto pré-definido de imagens e gera gráficos de "Fragmentos vs. Dose" e "Perímetro vs. Dose".
+
+* **`visualization-per-dose`**: Para cada imagem de um conjunto de doses, exibe na tela um gráfico comparativo com os contornos classificados como DNA e RNA.
+
+* **`skeleton-viz`**: Executa a análise de esqueletização, gerando e exibindo uma visualização do esqueleto sobreposto em cada imagem para um conjunto de doses.
+
+* **`skeleton-length`**: Executa a análise quantitativa de esqueletização, calculando o comprimento total das moléculas (em nm) e gerando um gráfico final de "Comprimento vs. Dose".
+
+### Exemplos de Uso
+
+Para executar uma análise, certifique-se de que seu ambiente virtual esteja ativado e rode o `main.py` a partir da pasta raiz do projeto, seguido pelo nome da pipeline.
+
+**Exemplo 1: Executar a Análise Estatística Padrão**
+```bash
+python main.py analysis
+```
+> Gera os arquivos CSV com os resultados na pasta `./results/`.
+
+**Exemplo 2: Pré-processar as Imagens**
+```bash
+python main.py preprocess
+```
+> Salva as imagens normalizadas na pasta de resultados correspondente.
+
+**Exemplo 3: Executar a Análise Quantitativa de Esqueletos**
+```bash
+python main.py skeleton-length
+```
+> Exibe os resultados numéricos no terminal e salva o gráfico final na pasta de resultados.
