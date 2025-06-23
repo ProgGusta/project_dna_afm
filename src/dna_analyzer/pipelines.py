@@ -1,5 +1,6 @@
 # src/dna_analyzer/pipelines.py
 import os
+import glob
 import pandas as pd
 from .io import Loader, Saver
 from .analyzer import Analyzer
@@ -14,14 +15,15 @@ def run_dose_response_pipeline():
     print("Executando a pipeline de Análise de Dose-Resposta...")
 
     # --- Configuração ---
+    INPUT_DIR = './data/processed/extended_images'  # Diretório principal com todas as imagens
     OUTPUT_DIR = './results/dose_response'
 
-    # Dicionário mapeando a dose para o caminho da imagem correspondente
-    IMAGE_PATHS = {
-        'Sem Irradiar': './data/processed/extended_images/sample_segmentation_17.png',
-        '0.4 Gy': './data/processed/extended_images/Amostra 1_0,4 Gy 2023-10-18 15h17m27_3x3 (1).png',
-        '0.7 Gy': './data/processed/extended_images/Amostrairradiada_03_0,7Gy_3x3.png',
-        '1.0 Gy': './data/processed/extended_images/Amostrairradiada_02_1Gy_3x3.png'
+    # Dicionário mapeando a dose para um padrão de nome de arquivo
+    DOSE_PATTERNS = {
+        'Sem Irradiar': '*sample_segmentation*.png',
+        '0.4 Gy': '*0,4 Gy*.png',
+        '0.7 Gy': '*0,7Gy*.png',
+        '1.0 Gy': '*1Gy*.png'
     }
 
     ANALYZER_CONFIG = {
@@ -30,70 +32,99 @@ def run_dose_response_pipeline():
     }
 
     # --- Lógica ---
-    loader, analyzer, visualizer = Loader(), Analyzer(config=ANALYZER_CONFIG), Visualizer()
+    loader, analyzer, visualizer, saver = Loader(), Analyzer(config=ANALYZER_CONFIG), Visualizer(), Saver(OUTPUT_DIR)
 
     # --- Processamento ---
-    all_results = []
+    all_individual_results = []
 
+    # Itera sobre cada dose e seu padrão
+    for dose, pattern in DOSE_PATTERNS.items():
+        # Usa glob para encontrar todos os arquivos que correspondem ao padrão no diretório de entrada
+        image_paths = glob.glob(os.path.join(INPUT_DIR, pattern))
+        
+        if not image_paths:
+            print(f"  Aviso: Nenhuma imagem encontrada para a dose '{dose}' com o padrão '{pattern}'")
+            continue
+            
+        print(f"  Encontradas {len(image_paths)} imagens para a dose: {dose}")
 
-    for dose, image_path in IMAGE_PATHS.items():
-        if not os.path.exists(image_path): continue
+        # Itera sobre cada imagem encontrada para a dose atual
+        for image_path in image_paths:
+            image = loader.load_grayscale(image_path)
+            if image is None: continue
+            
+            results = analyzer.process(image)
+            current_result = results["statistics"]
+            current_result['Dose'] = dose
+            current_result['Arquivo'] = os.path.basename(image_path) # Adiciona o nome do arquivo para rastreabilidade
+            all_individual_results.append(current_result)
 
+    if not all_individual_results:
+        print("Nenhuma imagem foi processada. Encerrando pipeline.")
+        return
 
-        image = loader.load_grayscale(image_path)
-        if image is None: continue
+    # --- Agregação e Salvamento dos Resultados ---
+    # Converte a lista de resultados individuais em um DataFrame do Pandas
+    df_individual = pd.DataFrame(all_individual_results)
+    saver.save_dataframe(df_individual, "resultados_individuais_por_arquivo.csv")
 
-        # Reutiliza o Analyzer para processar a imagem
-        results = analyzer.process(image)
+    # Usa groupby para agregar os resultados por dose (calculando média e desvio padrão)
+    # Seleciona apenas colunas numéricas para as operações de agregação
+    numeric_cols = df_individual.select_dtypes(include=['number']).columns
+    df_aggregated = df_individual.groupby('Dose')[numeric_cols].agg(['mean', 'std']).round(2)
+    saver.save_dataframe(df_aggregated, "resultados_agregados_por_dose.csv")
 
-        # Adiciona a informação da dose ao dicionário de resultados
-        current_result = results["statistics"]
-        current_result['Dose'] = dose
-        all_results.append(current_result)
-
-    print("\n--- Resultados da Análise de Dose-Resposta ---")
-    for r in all_results:
-        print(f"Dose: {r['Dose']}")
-        print(f"  Fragmentos de DNA: {r['Num DNA']}, Perímetro Total: {r['Perímetro DNA']:.2f}")
-        print(f"  Fragmentos de RNA: {r['Num RNA']}, Perímetro Total: {r['Perímetro RNA']:.2f}\n")
+    print("\n--- Resultados Agregados por Dose (Média) ---")
+    print(df_aggregated)
     
-    if all_results:
-        visualizer.plot_dose_response(all_results, output_dir=OUTPUT_DIR)
+    # --- Visualização dos Resultados Agregados ---
+    # Prepara os dados para o visualizer, usando a média dos resultados
+    df_mean = df_aggregated.xs('mean', axis=1, level=1).reset_index()
+    results_for_plot = df_mean.to_dict('records')
+    
+    visualizer = Visualizer()
+    visualizer.plot_dose_response(results_for_plot, output_dir=OUTPUT_DIR)
+    
     print("Pipeline de Análise de Dose-Resposta concluída.")
-
 
 def run_skeleton_analysis_pipeline():
     """Executa a análise de esqueletização e visualiza os resultados."""
     print("Executando a pipeline de Visualização de Esqueleto...")
 
     # --- Configuração ---
-    IMAGE_PATHS = {
-        'Sem Irradiar': './data/processed/extended_images/sample_segmentation_17.png',
-        '0.4 Gy': './data/processed/extended_images/Amostra 1_0,4 Gy 2023-10-18 15h17m27_3x3 (1).png',
-        '0.7 Gy': './data/processed/extended_images/Amostrairradiada_03_0,7Gy_3x3.png',
-        '1.0 Gy': './data/processed/extended_images/Amostrairradiada_02_1Gy_3x3.png'
+    INPUT_DIR = './data/processed/extended_images'  # Diretório principal com todas as imagens
+
+    # Dicionário mapeando a dose para um padrão de nome de arquivo
+    DOSE_PATTERNS = {
+        'Sem Irradiar': '*sample_segmentation*.png',
+        '0.4 Gy': '*0,4 Gy*.png',
+        '0.7 Gy': '*0,7Gy*.png',
+        '1.0 Gy': '*1Gy*.png'
     }
 
     # --- Lógica ---
     loader, analyzer, visualizer = Loader(), Analyzer(), Visualizer()
 
-    for dose, image_path in IMAGE_PATHS.items():
-        if not os.path.exists(image_path): continue
+    for dose, pattern in DOSE_PATTERNS.items():
+        # Usa glob para encontrar todos os arquivos que correspondem ao padrão no diretório de entrada
+        image_paths = glob.glob(os.path.join(INPUT_DIR, pattern))
+        print(f"  Analisando {len(image_paths)} imagens para a dose: {dose}")
 
-        image = loader.load_grayscale(image_path)
-        if image is None: continue
-        
-        # Executa a pipeline de esqueletização
-        results = analyzer.run_skeleton_pipeline(image)
+        for image_path in image_paths:
+            # Carrega a imagem em escala de cinza
+            image = loader.load_grayscale(image_path)
+            if image is None: continue
 
-        # Usa o Visualizer para plotar o resultado
-        visualizer.plot_skeleton_overlay(
-            original_image=results['original'],
-            skeleton_image=results['skeleton'],
-            dose_label=dose
-        )
+            # Executa a análise de esqueleto
+            results = analyzer.run_skeleton_pipeline(image)
+
+            visualizer.plot_skeleton_overlay(
+                original_image=results['original'],
+                skeleton_image=results['skeleton'],
+                dose_label=f"{dose} - {os.path.basename(image_path)}"
+            )
+
     print("Pipeline de Visualização de Esqueleto concluída.")
-
 
 def run_comparison_pipeline():
     """Executa a comparação de algoritmos de detecção de borda."""
@@ -176,14 +207,15 @@ def run_preprocessing_task_pipeline():
 
 def run_skeleton_length_analysis_pipeline():
     # --- Configuração ---
+    INPUT_DIR = './data/processed/extended_images'  # Diretório principal com todas as imagens
     OUTPUT_DIR = './results/figures/skeleton_length/'  # Nome da pasta de saída para os gráficos
 
-    # Dicionário mapeando a dose para o caminho da imagem
-    IMAGE_PATHS = {
-        'Sem Irradiar': './data/processed/extended_images/sample_segmentation_17.png',
-        '0.4 Gy': './data/processed/extended_images/Amostra 1_0,4 Gy 2023-10-18 15h17m27_3x3 (1).png',
-        '0.7 Gy': './data/processed/extended_images/Amostrairradiada_03_0,7Gy_3x3.png',
-        '1.0 Gy': './data/processed/extended_images/Amostrairradiada_02_1Gy_3x3.png'
+    # Dicionário mapeando a dose para um padrão de nome de arquivo
+    DOSE_PATTERNS = {
+        'Sem Irradiar': '*sample_segmentation*.png',
+        '0.4 Gy': '*0,4 Gy*.png',
+        '0.7 Gy': '*0,7Gy*.png',
+        '1.0 Gy': '*1Gy*.png'
     }
 
     # Metadados: Fator de conversão (nm por pixel) baseado na largura da imagem
@@ -203,30 +235,29 @@ def run_skeleton_length_analysis_pipeline():
     # --- Processamento ---
     all_results = []
 
-    for dose, image_path in IMAGE_PATHS.items():
+    for dose, pattern in DOSE_PATTERNS.items():
+        # Usa glob para encontrar todos os arquivos que correspondem ao padrão no diretório de entrada
+        image_paths = glob.glob(os.path.join(INPUT_DIR, pattern))
         print(f"Processando amostra da dose: {dose}...")
-        
-        if not os.path.exists(image_path):
-            print(f"  AVISO: Arquivo não encontrado em '{image_path}'. Pulando esta dose.")
-            continue
 
-        image = loader.load_grayscale(image_path)
-        if image is None: continue
+        for image_path in image_paths:
+            image = loader.load_grayscale(image_path)
+            if image is None: continue
 
-        # Determina o fator de conversão a partir da largura da imagem
-        width = image.shape[1]
-        conversion_factor = CONVERSION_FACTORS.get(width)
-        if conversion_factor is None:
-            print(f"  ERRO: Fator de conversão não encontrado para a resolução {width}px. Pulando dose.")
-            continue
+            # Determina o fator de conversão a partir da largura da imagem
+            width = image.shape[1]
+            conversion_factor = CONVERSION_FACTORS.get(width)
+            if conversion_factor is None:
+                print(f"  ERRO: Fator de conversão não encontrado para a resolução {width}px. Pulando dose.")
+                continue
 
-        # Executa a nova pipeline de quantificação, passando o fator de conversão
-        results = analyzer.run_skeleton_quantification_pipeline(image, conversion_factor)
-        
-        all_results.append({
-            'Dose': dose,
-            'Comprimento Esquelético': results['comprimento_esqueletico_nm']
-        })
+            # Executa a nova pipeline de quantificação, passando o fator de conversão
+            results = analyzer.run_skeleton_quantification_pipeline(image, conversion_factor)
+            
+            all_results.append({
+                'Dose': dose,
+                'Comprimento Esquelético': results['comprimento_esqueletico_nm']
+            })
     
     # --- Relatório Final ---
     if not all_results:
@@ -240,14 +271,16 @@ def run_skeleton_length_analysis_pipeline():
     # Gera o gráfico final
     visualizer.plot_skeleton_length_vs_dose(all_results, output_dir=OUTPUT_DIR)
 
-
 def run_visualization_per_dose_pipeline():
     # --- Configuração ---
-    IMAGE_PATHS = {
-        'Sem Irradiar': './data/processed/extended_images/sample_segmentation_17.png',
-        '0.4 Gy': './data/processed/extended_images/Amostra 1_0,4 Gy 2023-10-18 15h17m27_3x3 (1).png',
-        '0.7 Gy': './data/processed/extended_images/Amostrairradiada_03_0,7Gy_3x3.png',
-        '1.0 Gy': './data/processed/extended_images/Amostrairradiada_02_1Gy_3x3.png'
+    INPUT_DIR = './data/processed/extended_images'  # Diretório principal com todas as imagens
+
+    # Dicionário mapeando a dose para um padrão de nome de arquivo
+    DOSE_PATTERNS = {
+        'Sem Irradiar': '*sample_segmentation*.png',
+        '0.4 Gy': '*0,4 Gy*.png',
+        '0.7 Gy': '*0,7Gy*.png',
+        '1.0 Gy': '*1Gy*.png'
     }
 
     ANALYZER_CONFIG = {
@@ -263,31 +296,38 @@ def run_visualization_per_dose_pipeline():
     # --- Processamento e Visualização ---
     all_results = []
 
-    for dose, image_path in IMAGE_PATHS.items():
-        print(f"Processando amostra da dose: {dose}...")
+    # Itera sobre cada dose e seu padrão
+    for dose, pattern in DOSE_PATTERNS.items():
+        # Usa glob para encontrar todos os arquivos que correspondem ao padrão no diretório de entrada
+        image_paths = glob.glob(os.path.join(INPUT_DIR, pattern))
         
-        if not os.path.exists(image_path):
-            print(f"  AVISO: Arquivo não encontrado em '{image_path}'. Pulando esta dose.")
+        if not image_paths:
+            print(f"  Aviso: Nenhuma imagem encontrada para a dose '{dose}' com o padrão '{pattern}'")
             continue
+            
+        print(f"  Encontradas {len(image_paths)} imagens para a dose: {dose}")
 
-        image = loader.load_grayscale(image_path)
-        if image is None:
-            continue
+        # Itera sobre cada imagem encontrada para a dose atual
+        for image_path in image_paths:
 
-        # A classe Analyzer já faz todo o processamento e retorna tudo o que precisamos
-        results = analyzer.process(image)
-        
-        # Adiciona a informação da dose e armazena
-        current_stats = results["statistics"]
-        current_stats['Dose'] = dose
-        all_results.append(current_stats)
+            image = loader.load_grayscale(image_path)
+            if image is None:
+                continue
 
-        # Usa o novo método do Visualizer para exibir o par de imagens (DNA/RNA)
-        visualizer.plot_classified_image_pair(
-            dna_image=results["dna_image"], 
-            rna_image=results["rna_image"],
-            title_prefix=dose
-        )
+            # A classe Analyzer já faz todo o processamento e retorna tudo o que precisamos
+            results = analyzer.process(image)
+            
+            # Adiciona a informação da dose e armazena
+            current_stats = results["statistics"]
+            current_stats['Dose'] = dose
+            all_results.append(current_stats)
+
+            # Usa o novo método do Visualizer para exibir o par de imagens (DNA/RNA)
+            visualizer.plot_classified_image_pair(
+                dna_image=results["dna_image"], 
+                rna_image=results["rna_image"],
+                title_prefix=dose
+            )
 
     # --- Relatório Final no Console ---
     if not all_results:
