@@ -7,7 +7,8 @@ from dna_analyzer import (
     run_preprocessing_task_pipeline,
     run_skeleton_length_analysis_pipeline,
     run_visualization_per_dose_pipeline,
-    run_analysis_pipeline
+    run_analysis_pipeline,
+    run_full_skeleton_analysis_pipeline
 )
 
 # Mapeia os nomes amigáveis das pipelines para as funções que as executam
@@ -18,7 +19,8 @@ PIPELINES = {
     "preprocess": run_preprocessing_task_pipeline,
     "skeleton-length": run_skeleton_length_analysis_pipeline,
     "visualization-per-dose": run_visualization_per_dose_pipeline,
-    "analysis": run_analysis_pipeline
+    "analysis": run_analysis_pipeline,
+    "full-skeleton-analysis": run_full_skeleton_analysis_pipeline
 }
 
 def main():

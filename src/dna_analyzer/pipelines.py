@@ -2,6 +2,8 @@
 import os
 import glob
 import pandas as pd
+import cv2
+import numpy as np
 from .io import Loader, Saver
 from .analyzer import Analyzer
 from .visualizer import Visualizer
@@ -397,3 +399,82 @@ def run_analysis_pipeline():
     saver.save_dataframe(df_descriptive_stats, "estatisticas_descritivas_gerais.csv")
     
     print("\nAnálise e geração de estatísticas concluídas com sucesso.")
+
+def run_full_skeleton_analysis_pipeline():
+    """
+    Pipeline completa que extrai o comprimento de cada molécula individualmente,
+    calcula estatísticas descritivas e gera gráficos de distribuição.
+    """
+    print("Executando a pipeline de Análise Estatística de Esqueletos...")
+    # --- Configuração ---
+    INPUT_DIR = './data/processed/extended_images'  # Diretório principal com todas as imagens
+    OUTPUT_DIR = './results/full_skeleton_analysis'
+    DOSE_PATTERNS = {
+        'Sem Irradiar': '*sample_segmentation*.png', '0.4 Gy': '*0,4 Gy*.png',
+        '0.7 Gy': '*0,7Gy*.png', '1.0 Gy': '*1Gy*.png'
+    }
+    CONVERSION_FACTORS = { 512: 5.86, 1024: 2.93 } # nm/pixel
+    
+    # --- Inicialização ---
+    loader, analyzer, stats_calc, visualizer, saver = Loader(), Analyzer(), StatsCalculator(), Visualizer(), Saver(OUTPUT_DIR)
+    all_lengths = []
+
+    for dose, pattern in DOSE_PATTERNS.items():
+        image_paths = glob.glob(os.path.join(INPUT_DIR, pattern))
+        if not image_paths: continue
+        print(f"  Processando {len(image_paths)} imagens para a dose: {dose}")
+
+        for image_path in image_paths:
+            image = loader.load_grayscale(image_path)
+            if image is None: continue
+
+            conversion_factor = CONVERSION_FACTORS.get(image.shape[1])
+            if conversion_factor is None: continue
+
+            # Executa a pipeline de segmentação para obter a imagem binária
+            blurred = analyzer.preprocessor.apply_gaussian_blur(image)
+            binary_image = analyzer.segmenter.segment_with_adaptive_threshold(blurred)
+
+            # Encontra os contornos de cada molécula individual
+            contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Para cada contorno, cria uma máscara, extrai seu esqueleto e calcula o comprimento
+            for contour in contours:
+                # Ignora ruídos muito pequenos
+                if cv2.contourArea(contour) < 5: continue
+                
+                mask = np.zeros_like(binary_image)
+                cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
+                
+                skeleton = analyzer.extractor.extract_skeleton(mask)
+                length = analyzer.extractor.calculate_skeleton_length(skeleton, conversion_factor)
+                
+                if length > 0:
+                    all_lengths.append({'Dose': dose, 'Comprimento': length})
+
+    if not all_lengths:
+        print("Nenhum comprimento de molécula foi extraído.")
+        return
+
+    # --- Análise Estatística e Visualização ---
+    df_lengths = pd.DataFrame(all_lengths)
+    
+    # 1. Calcular estatísticas descritivas
+    df_stats = stats_calc.calculate_length_descriptive_stats(df_lengths)
+    print("\n--- Estatísticas Descritivas por Dose ---")
+    print(df_stats)
+    saver.save_dataframe(df_stats, "estatisticas_descritivas_comprimento.csv")
+    
+    # 2. Gerar e salvar gráficos de distribuição
+    visualizer.plot_length_histogram(df_lengths, output_dir=OUTPUT_DIR)
+    visualizer.plot_length_boxplot(df_lengths, output_dir=OUTPUT_DIR)
+
+    # 3. Gerar e salvar o gráfico de dispersão
+    visualizer.plot_mean_length_vs_dose_scatter(df_stats, output_dir=OUTPUT_DIR)
+
+    # 4. Realizar e salvar a análise estatística inferencial
+    inferential_report = stats_calc.perform_inferential_analysis(df_lengths)
+    print("\n" + inferential_report)
+    saver.save_text(inferential_report, "relatorio_analise_inferencial.txt")
+    
+    print("Pipeline de Análise Estatística de Esqueletos concluída.")

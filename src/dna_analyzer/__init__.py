@@ -19,7 +19,8 @@ from .pipelines import (
     run_preprocessing_task_pipeline,
     run_skeleton_length_analysis_pipeline,
     run_visualization_per_dose_pipeline,
-    run_analysis_pipeline
+    run_analysis_pipeline,
+    run_full_skeleton_analysis_pipeline
 )
 
 __all__ = [
@@ -27,7 +28,8 @@ __all__ = [
     'StatsCalculator', 'Visualizer', 'Analyzer', 'run_dose_response_pipeline',
     'run_skeleton_analysis_pipeline', 'run_comparison_pipeline',
     'run_preprocessing_task_pipeline', 'run_skeleton_length_analysis_pipeline',
-    'run_visualization_per_dose_pipeline', 'run_analysis_pipeline'
+    'run_visualization_per_dose_pipeline', 'run_analysis_pipeline',
+    'run_full_skeleton_analysis_pipeline'
 ]
 
 __version__ = "2.0.0" # Versão atualizada

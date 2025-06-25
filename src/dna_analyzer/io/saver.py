@@ -20,3 +20,12 @@ class Saver:
         path = os.path.join(self.output_dir, filename)
         dataframe.to_csv(path, index=False)
         print(f"Resultados salvos em: {path}")
+
+    def save_text(self, text_content: str, filename: str):
+        """
+        Salva um conteúdo de texto em um arquivo .txt no diretório de saída.
+        """
+        path = os.path.join(self.output_dir, filename)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(text_content)
+        print(f"Relatório de texto salvo em: {path}")

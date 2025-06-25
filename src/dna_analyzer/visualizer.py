@@ -3,6 +3,9 @@ import cv2
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import seaborn as sns
+import re
+import pandas as pd
 
 class Visualizer:
     """Classe para criar visualizações dos resultados da análise."""
@@ -209,3 +212,79 @@ class Visualizer:
         plt.close()
 
         print(f"Gráfico de comprimento vs. dose salvo em: {output_dir}")
+
+    def plot_length_histogram(self, length_df: pd.DataFrame, output_dir: str):
+        """
+        Gera e salva um histograma da distribuição de comprimentos para cada dose.
+        """
+        if length_df.empty: return
+        os.makedirs(output_dir, exist_ok=True)
+        
+        g = sns.FacetGrid(length_df, col="Dose", col_wrap=2, sharex=False, sharey=False, height=4)
+        g.map(sns.histplot, "Comprimento", kde=True)
+        g.fig.suptitle("Distribuição dos Comprimentos por Dose", y=1.03)
+        
+        save_path = os.path.join(output_dir, "histograma_distribuicao_comprimentos.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Histograma de distribuição salvo em: {save_path}")
+
+    def plot_length_boxplot(self, length_df: pd.DataFrame, output_dir: str):
+        """
+        Gera e salva um boxplot da distribuição de comprimentos para cada dose.
+        """
+        if length_df.empty: return
+        os.makedirs(output_dir, exist_ok=True)
+        
+        plt.figure(figsize=(12, 8))
+        sns.boxplot(x="Dose", y="Comprimento", data=length_df, order=sorted(length_df['Dose'].unique()))
+        plt.title("Boxplot da Distribuição dos Comprimentos por Dose")
+        plt.xlabel("Dose (Gy)")
+        plt.ylabel("Comprimento da Molécula (nm)")
+        plt.grid(True, linestyle='--', alpha=0.6)
+        
+        save_path = os.path.join(output_dir, "boxplot_distribuicao_comprimentos.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Boxplot de distribuição salvo em: {save_path}")
+
+    def plot_mean_length_vs_dose_scatter(self, aggregated_df: pd.DataFrame, output_dir: str):
+        """
+        Gera e salva um gráfico de dispersão do comprimento médio vs. dose, 
+        com uma linha de regressão.
+        """
+        if aggregated_df.empty: return
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Prepara os dados para o plot
+        plot_data = aggregated_df.reset_index()
+        
+        # Converte a coluna 'Dose' (texto) para numérica
+        def dose_to_numeric(dose_str):
+            match = re.match(r"([0-9,.]+)", dose_str)
+            return float(match.group(1).replace(',', '.')) if match else 0.0
+            
+        plot_data['Dose Numérica'] = plot_data['Dose'].apply(dose_to_numeric)
+        
+        # Extrai a média do comprimento (lidando com MultiIndex de colunas)
+        if ('Comprimento', 'mean') in plot_data.columns:
+            plot_data['Comprimento Médio'] = plot_data[('Comprimento', 'mean')]
+        elif 'mean' in plot_data.columns:
+            plot_data['Comprimento Médio'] = plot_data['mean']
+        else:
+            print("Aviso: Coluna de comprimento médio não encontrada para o gráfico de dispersão.")
+            return
+
+        plt.figure(figsize=(10, 6))
+        # Usa regplot do seaborn para criar o scatter plot com linha de regressão
+        sns.regplot(x='Dose Numérica', y='Comprimento Médio', data=plot_data)
+        
+        plt.title('Comprimento Médio do Esqueleto vs. Dose de Radiação')
+        plt.xlabel('Dose (Gy)')
+        plt.ylabel('Comprimento Médio (nm)')
+        plt.grid(True, linestyle='--', alpha=0.6)
+        
+        save_path = os.path.join(output_dir, "scatterplot_comprimento_medio_vs_dose.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Gráfico de dispersão salvo em: {save_path}")

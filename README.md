@@ -155,6 +155,15 @@ options:
 
 * **`skeleton-length`**: Executa a análise quantitativa de esqueletização, calculando o comprimento total das moléculas (em nm) e gerando um gráfico final de "Comprimento vs. Dose".
 
+* **`full-skeleton-analysis`**: Esta é a pipeline de análise mais completa do projeto, projetada para realizar uma investigação quantitativa e estatística detalhada sobre o comprimento das moléculas de DNA.
+    - Encontra automaticamente todas as imagens relevantes para cada dose usando padrões de nome de arquivo.
+    - Processa cada imagem para extrair o esqueleto de **cada molécula individualmente**.
+    - Calcula o comprimento (em nanômetros) de cada esqueleto molecular.
+    - Gera um relatório completo de **estatística descritiva** (média, mediana, desvio padrão, quartis, etc.) para os comprimentos em cada grupo de dose.
+    - Realiza testes de **estatística inferencial** (ANOVA/Kruskal-Wallis, testes par a par e correlação com a dose) para verificar a significância estatística das diferenças.
+    - Cria e salva múltiplas **visualizações** para análise da distribuição dos dados, incluindo histogramas, boxplots e um gráfico de dispersão do comprimento médio versus a dose.
+    - **Saída**: Gera uma pasta completa de resultados em `./results/full_skeleton_analysis/` com arquivos `.csv` para as estatísticas, `.txt` para o relatório inferencial e `.png` para os gráficos.
+
 ### Exemplos de Uso
 
 Para executar uma análise, certifique-se de que seu ambiente virtual esteja ativado e rode o `main.py` a partir da pasta raiz do projeto, seguido pelo nome da pipeline.
