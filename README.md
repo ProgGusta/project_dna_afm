@@ -104,7 +104,7 @@ Todas as bibliotecas necessárias estão listadas no arquivo `pyproject.toml`. I
 ```bash
 pip install -e .
 ```
-* **Nota**: A flag `-e` instala o projeto em "modo editável", o que significa que as alterações que você fizer nos arquivos `.py` em `src/` serão refletidas imediatamente, sem a necessidade de reinstalar.
+* **Nota**: A flag `-e` instala o projeto em "modo editável". O que significa que as alterações que você fizer nos arquivos `.py` em `src/` serão refletidas imediatamente, sem a necessidade de reinstalar.
 
 * **Dependência Especial**: Algumas análises (como a de esqueletização) requerem o pacote `opencv-contrib-python`. Garanta que ele esteja instalado:
     ```bash
